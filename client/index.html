@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:400,500,700,400italic|Material+Icons">
+<link rel="icon" 
+      type="image/png" 
+      href="/static/favicon.png" sizes="32x32">
+<title>YawnMeter | Online OTT Aggregator</title>
+<meta name="description" content="We provide what’s fresh on the market for online shows along with streaming service suggestions to suit your budget."/>
+</head>
+<body background="#fff">
+<div id="app"></div>
+<!-- built files will be auto injected -->
+</body>
+<script type="text/javascript" src="https://apis.google.com/js/api:client.js"></script>
+<script type="text/javascript" async src="https://www.googletagmanager.com/gtag/js?id=UA-132057560-1"></script>
+<script type="text/javascript">
+window.fbAsyncInit = function() {
+FB.init({
+appId            : '296795854382244',
+autoLogAppEvents : true,
+xfbml            : true,
+version          : 'v2.10'
+});
+FB.AppEvents.logPageView();
+};
+
+(function(d, s, id){
+var js, fjs = d.getElementsByTagName(s)[0];
+if (d.getElementById(id)) {return;}
+js = d.createElement(s); js.id = id;
+js.src = "//connect.facebook.net/en_US/sdk.js";
+fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));
+</script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+
+gtag('config', 'UA-132057560-1');
+</script>
+</html>

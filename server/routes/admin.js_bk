@@ -1,0 +1,216 @@
+const express=require('express');
+const abc=express();
+const router=express.Router();
+const sqldb=require('./mysqldb');
+const jwt = require('jsonwebtoken');
+var ObjectID = require('mongodb').ObjectID;
+var async=require('async');
+//local
+//const config=require('.././security/config.json');
+//server config
+const config=require('/etc/letsencrypt/archive/yawnmeter.com/config.json');
+const AWS = require('aws-sdk');
+AWS.config.update({
+    region: 'us-east-1',
+    accessKeyId:config.AWS_ACCESS_KEY,
+    secretAccessKey:config.AWS_SECRET_KEY
+});
+var s3 = new AWS.S3();
+
+router.get('/admin/:EmailID,:Password', (req, res) => {
+  
+db.collection('admin').findOne({EmailID:req.params.EmailID.trim(),Password:req.params.Password}).then(function(user){
+
+  if(user)
+  {
+	const tokenId=jwt.sign({
+    EmailID:user.EmailID,
+    _id: user._id
+    },
+    'yawnadmin',
+    {
+    expiresIn: '7 days'
+    });
+    db.collection('admin').updateOne({_id:user._id},{$set:{adminToken:tokenId}}).then(function(data){
+		
+	return res.status(200).send({result: 'Authenticated', token:tokenId});
+
+    })
+
+   }
+      else{return res.status(401).send({result: 'Unauthenticated Access'});}
+  
+  })
+  .catch(error => {return res.status(500).send({error: error})});
+  
+})
+
+
+
+router.get('/fetchData',(req,res)=>{
+async.parallel([
+
+	function(callback) {
+    
+    db.collection('mapping').find({}).toArray(function(err,result){
+    	if(err){
+    		return callback(err);
+    	}
+
+    	return callback(null,result);
+
+    }) 
+
+    },
+    function(callback) {
+      
+    sqldb.query("SELECT * FROM series_category", function (err, rows1, fields) {
+    if (err){
+
+    	callback(err);
+    } 
+    var result1=JSON.stringify(rows1);
+
+    return callback(null,result1);
+
+});
+    },
+    function(callback) {
+        sqldb.query("SELECT * FROM media_language",function (err,rows2,fields) {
+            if (err) {
+                return callback(err);
+            }
+
+           var result2=JSON.stringify(rows2);
+           return callback(null,result2);
+        });
+    }
+], function(error, callbackResults) {
+    if (error) {
+        //handle error
+        console.log(error);
+    } else {
+
+    	const fetchData=callbackResults[0];
+    	const categories=callbackResults[1];
+    	const languages=callbackResults[2];
+     
+        return res.status(200).send({fetchData,categories,languages});
+    }
+});
+
+})
+
+router.post('/insertData',(req,res)=>{
+const base64Data = new Buffer(req.body.thumbnail.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+const type = req.body.thumbnail.split(';')[0].split('/')[1];
+var params = {
+	Bucket: 'yawn-img',
+	Key : `${req.body.title}.${type}`,
+	Body: base64Data,
+  	ContentEncoding: 'base64',
+	ContentType: `image/${type}` 
+};
+
+s3.upload(params, function (err, data) {
+  //handle error
+  if (err) {
+    console.log("Error", err);
+  }
+  //success
+  if (data) {
+    uploadData(data.Location);
+  }
+});
+
+
+uploadData=(imageThumbnail)=>{
+
+if(req.body.contentType==='series'){
+
+	if(req.body.id){
+	db.collection('Episodes').insertOne({
+	seriesId:new ObjectID(req.body.id),
+	title:req.body.title,
+	thumbnail:imageThumbnail,
+	publisher:req.body.publisher,
+	URL:req.body.url,
+	Rating:req.body.rating,
+	Review:req.body.review,
+	description:req.body.description,
+	categories:req.body.genres,
+	languages:req.body.languages,
+	RatingCount:0,
+	TotalRatings:0,
+	viewCount:0,
+	actionCount:0,
+	contentType:req.body.contentType,
+	insertedOn:new Date
+	}).then(function(data){
+		const episode=data['ops']
+		db.collection('mapping').findOne({_id:episode[0].seriesId}).then(function(series){
+		db.collection('mapping').updateOne({_id:series._id},{ $push: { Episodes:episode[0] } }).then(function(err,output){
+
+			res.status(200).send({result:'data submitted succesfully'});
+
+		})
+			
+		})
+	})	
+	}
+	else{
+	db.collection('mapping').insertOne({
+	title:req.body.title,
+	thumbnail:imageThumbnail,
+	publisher:req.body.publisher,
+	URL:req.body.url,
+	Episodes:[],
+	Rating:req.body.rating,
+	Review:req.body.review,
+	description:req.body.description,
+	categories:req.body.genres,
+	languages:req.body.languages,
+	RatingCount:0,
+	TotalRatings:0,
+	viewCount:0,
+	actionCount:0,
+	contentType:req.body.contentType,
+	insertedOn:new Date
+	}).then(function(err,data){
+
+		return res.status(200).send({result:'data submitted succesfully'});
+	})	
+	}
+}
+
+if(req.body.contentType==='singles'){
+	db.collection('media').insertOne({
+	title:req.body.title,
+	thumbnail:imageThumbnail,
+	publisher:req.body.publisher,
+	URL:req.body.url,
+	Rating:req.body.rating,
+	Review:req.body.review,
+	description:req.body.description,
+	categories:req.body.genres,
+	languages:req.body.languages,
+	RatingCount:0,
+	TotalRatings:0,
+	viewCount:0,
+	actionCount:0,
+	contentType:req.body.contentType,
+	insertedOn:new Date
+	}).then(function(err,data){
+
+		return res.status(200).send({result:'data submitted succesfully'});
+	})	
+}
+
+
+
+}
+
+
+})
+
+module.exports=router;
